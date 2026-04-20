@@ -8,6 +8,34 @@ import {
   AppInfo 
 } from './ipcChannels';
 
+export interface AIActionRequest {
+  provider: string;
+  config: {
+    provider: 'openai' | 'anthropic' | 'ollama';
+    model: string;
+    apiKey?: string;
+    baseUrl?: string;
+    temperature?: number;
+    maxTokens?: number;
+  };
+  context: {
+    gameState: unknown;
+    playerId: string;
+    availableActions: string[];
+    callAmount: number;
+    minRaiseAmount: number;
+    potSize: number;
+  };
+}
+
+export interface AIActionResponse {
+  success: boolean;
+  action?: string;
+  amount?: number;
+  rawResponse?: string;
+  error?: string;
+}
+
 const electronAPI = {
   config: {
     save: (config: MatchConfig): Promise<boolean> => 
@@ -40,6 +68,15 @@ const electronAPI = {
   ai: {
     request: (request: AIRequest): Promise<AIResponse> => 
       ipcRenderer.invoke(IPC_CHANNELS.AI_REQUEST, request),
+    
+    getAction: (request: AIActionRequest): Promise<AIActionResponse> => 
+      ipcRenderer.invoke('ai:action', request),
+    
+    testConnection: (provider: string, config: { apiKey?: string; baseUrl?: string; model?: string }): Promise<{ success: boolean; error?: string }> => 
+      ipcRenderer.invoke('ai:test', provider, config),
+    
+    getProviders: (): Promise<string[]> => 
+      ipcRenderer.invoke('ai:providers'),
   },
 
   file: {

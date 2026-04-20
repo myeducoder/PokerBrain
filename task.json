@@ -38,7 +38,7 @@
     "id": "6",
     "title": "Implement LLM Service Integration",
     "description": "In the Electron main process, create services to format game state into prompts and communicate with LLM APIs to get actions.",
-    "passes": false,
+    "passes": true,
     "priority": 6
   },
   {
