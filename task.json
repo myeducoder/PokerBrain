@@ -24,7 +24,7 @@
     "id": "4",
     "title": "Implement IPC and Config Management",
     "description": "Set up IPC bridge between Electron main and renderer processes. Create basic file saving/loading for configurations.",
-    "passes": false,
+    "passes": true,
     "priority": 4
   },
   {
