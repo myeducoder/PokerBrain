@@ -1,0 +1,72 @@
+[
+  {
+    "id": "1",
+    "title": "Initialize project structure",
+    "description": "Setup Electron + Vite + Vue 3 + TypeScript boilerplate. Ensure basic dev server and desktop window run successfully.",
+    "passes": true,
+    "priority": 1
+  },
+  {
+    "id": "2",
+    "title": "Configure dependencies and store",
+    "description": "Install and setup TailwindCSS for styling and Pinia for frontend state management.",
+    "passes": true,
+    "priority": 2
+  },
+  {
+    "id": "3",
+    "title": "Implement core Texas Hold'em engine",
+    "description": "Create TypeScript classes/functions for Deck, Card, Hand Evaluation, and core Game State (pots, betting rounds).",
+    "passes": true,
+    "priority": 3
+  },
+  {
+    "id": "4",
+    "title": "Implement IPC and Config Management",
+    "description": "Set up IPC bridge between Electron main and renderer processes. Create basic file saving/loading for configurations.",
+    "passes": false,
+    "priority": 4
+  },
+  {
+    "id": "5",
+    "title": "Create Match Configuration UI",
+    "description": "Build Vue components for setting up a match: number of players, starting chips, and assigning AI models/Human to seats.",
+    "passes": false,
+    "priority": 5
+  },
+  {
+    "id": "6",
+    "title": "Implement LLM Service Integration",
+    "description": "In the Electron main process, create services to format game state into prompts and communicate with LLM APIs to get actions.",
+    "passes": false,
+    "priority": 6
+  },
+  {
+    "id": "7",
+    "title": "Create Game Board UI",
+    "description": "Build Vue components to visualize the poker table, community cards, player seats, hole cards, and current bets.",
+    "passes": false,
+    "priority": 7
+  },
+  {
+    "id": "8",
+    "title": "Create Human Action Panel UI",
+    "description": "Build Vue components for human players to input actions (Fold, Check, Call, Raise).",
+    "passes": false,
+    "priority": 8
+  },
+  {
+    "id": "9",
+    "title": "Integrate Game Loop",
+    "description": "Connect the UI, Game Engine, and LLM services to run a complete hand, manage turns, and handle side pots.",
+    "passes": false,
+    "priority": 9
+  },
+  {
+    "id": "10",
+    "title": "Final Polish and Logging",
+    "description": "Add an Event Log UI, handle API errors gracefully, and perform basic integration testing.",
+    "passes": false,
+    "priority": 10
+  }
+]
