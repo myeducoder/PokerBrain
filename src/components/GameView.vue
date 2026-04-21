@@ -43,7 +43,11 @@
         </div>
 
         <aside class="game-sidebar">
-          <GameLog :log="gameLog" :handNumber="handNumber" />
+          <GameLog 
+            :log="gameLog" 
+            :handNumber="handNumber" 
+            @clear="clearLog"
+          />
         </aside>
       </div>
 
@@ -88,11 +92,19 @@
         @action="doAction"
       />
     </main>
+
+    <Notification
+      :visible="showNotification"
+      :type="notificationType"
+      :title="notificationTitle"
+      :message="notificationMessage"
+      @close="closeNotification"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../store/gameStore';
@@ -100,6 +112,7 @@ import { useMatchConfigStore } from '../store/matchConfig';
 import PokerTable from './game/PokerTable.vue';
 import GameLog from './game/GameLog.vue';
 import ActionPanel from './game/ActionPanel.vue';
+import Notification from './game/Notification.vue';
 import type { PlayerAction } from '../game/types';
 
 const router = useRouter();
@@ -122,10 +135,24 @@ const {
   totalPot,
   currentPlayer,
   isHumanTurn,
-  isGameComplete
+  isGameComplete,
+  error
 } = storeToRefs(gameStore);
 
 const showHandComplete = ref(false);
+const showNotification = ref(false);
+const notificationType = ref<'error' | 'warning' | 'success' | 'info'>('error');
+const notificationTitle = ref('');
+const notificationMessage = ref('');
+
+watch(error, (newError) => {
+  if (newError) {
+    notificationType.value = 'error';
+    notificationTitle.value = 'Error';
+    notificationMessage.value = newError;
+    showNotification.value = true;
+  }
+});
 
 const phaseLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -176,6 +203,15 @@ async function doAction(action: PlayerAction, amount?: number) {
 async function startNewHand() {
   showHandComplete.value = false;
   await gameStore.startNewHand();
+}
+
+function clearLog() {
+  gameStore.clearLog();
+}
+
+function closeNotification() {
+  showNotification.value = false;
+  gameStore.clearError();
 }
 
 onMounted(async () => {

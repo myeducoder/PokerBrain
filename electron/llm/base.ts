@@ -14,6 +14,8 @@ export interface LLMResponse {
     completionTokens: number;
     totalTokens: number;
   };
+  usedFallback?: boolean;
+  fallbackFrom?: string;
 }
 
 export interface LLMRequestOptions {

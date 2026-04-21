@@ -67,6 +67,14 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  function clearLog() {
+    gameLog.value = [];
+  }
+
+  function clearError() {
+    error.value = null;
+  }
+
   function setupEventListeners() {
     if (!window.electronAPI) return;
 
@@ -272,6 +280,8 @@ export const useGameStore = defineStore('game', () => {
     activePlayers,
     isHumanTurn,
     addLog,
+    clearLog,
+    clearError,
     startGame,
     startNewHand,
     playerAction,
