@@ -7,7 +7,8 @@ import './style.css';
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: '/', component: () => import('./components/Home.vue') }
+    { path: '/', component: () => import('./components/Home.vue') },
+    { path: '/game', component: () => import('./components/GameView.vue') }
   ]
 });
 

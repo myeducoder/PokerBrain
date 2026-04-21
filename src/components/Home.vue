@@ -60,12 +60,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useMainStore } from '../store/index';
 import { useMatchConfigStore } from '../store/matchConfig';
 import ConfigList from '../components/ConfigList.vue';
 import MatchSettings from '../components/MatchSettings.vue';
 
+const router = useRouter();
 const mainStore = useMainStore();
 const matchConfigStore = useMatchConfigStore();
 const { currentConfig, isLoading, error } = storeToRefs(matchConfigStore);
@@ -102,6 +104,7 @@ function saveCurrentConfig() {
 
 function startGame() {
   if (!currentConfig.value) return;
-  console.log('Starting game with config:', currentConfig.value);
+  matchConfigStore.saveConfig(currentConfig.value);
+  router.push('/game');
 }
 </script>

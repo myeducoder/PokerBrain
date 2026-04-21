@@ -45,7 +45,7 @@
     "id": "7",
     "title": "Create Game Board UI",
     "description": "Build Vue components to visualize the poker table, community cards, player seats, hole cards, and current bets.",
-    "passes": false,
+    "passes": true,
     "priority": 7
   },
   {
