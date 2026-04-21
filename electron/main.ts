@@ -4,6 +4,8 @@ import { IPC_CHANNELS, MatchConfig, SavedGame, AIRequest, AIResponse } from './i
 import { configService } from './configService';
 import { chat, getAvailableProviders } from './llm/index';
 import { getAIAction, testAIConnection, AIActionRequest } from './aiService';
+import { gameManager } from './gameManager';
+import type { PlayerAction } from '../src/game/types';
 
 let win: BrowserWindow | null;
 
@@ -17,6 +19,8 @@ function createWindow() {
       contextIsolation: true,
     },
   });
+
+  gameManager.setWindow(win);
 
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -111,6 +115,28 @@ function setupIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.APP_INFO, async () => {
     return configService.getAppInfo();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.GAME_START, async (_event, config: MatchConfig) => {
+    return gameManager.startGame(config);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.GAME_NEW_HAND, async () => {
+    return gameManager.startNewHand();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.GAME_ACTION, async (_event, action: PlayerAction, amount?: number) => {
+    await gameManager.executeAction(action, amount);
+    return gameManager.getState();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.GAME_STATE, async () => {
+    return gameManager.getState();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.GAME_STOP, async () => {
+    gameManager.stopGame();
+    return true;
   });
 }
 

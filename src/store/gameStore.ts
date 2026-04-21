@@ -1,20 +1,21 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { GameEngine } from '../game/gameEngine';
 import type { 
   GameState, 
-  GameConfig, 
   PlayerAction
 } from '../game/types';
 import type { MatchConfig } from '../../electron/ipcChannels';
 
 export const useGameStore = defineStore('game', () => {
-  const engine = ref<GameEngine | null>(null);
   const gameState = ref<GameState | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const gameLog = ref<string[]>([]);
   const currentMatchConfig = ref<MatchConfig | null>(null);
+  const aiThinkingPlayerId = ref<string | null>(null);
+  const isGameComplete = ref(false);
+
+  const unsubscribers: (() => void)[] = [];
 
   const phase = computed(() => gameState.value?.phase ?? 'waiting');
   const players = computed(() => gameState.value?.players ?? []);
@@ -50,6 +51,14 @@ export const useGameStore = defineStore('game', () => {
     players.value.filter(p => !p.isFolded && p.chips > 0)
   );
 
+  const isHumanTurn = computed(() => {
+    if (!currentPlayer.value || !gameState.value) return false;
+    return currentPlayer.value.type === 'human' && 
+           !currentPlayer.value.isFolded && 
+           phase.value !== 'showdown' && 
+           phase.value !== 'ended';
+  });
+
   function addLog(message: string) {
     const timestamp = new Date().toLocaleTimeString();
     gameLog.value.unshift(`[${timestamp}] ${message}`);
@@ -58,30 +67,73 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function startGame(config: MatchConfig) {
+  function setupEventListeners() {
+    if (!window.electronAPI) return;
+
+    const unsubState = window.electronAPI.game.onStateChange((state: GameState) => {
+      gameState.value = state;
+    });
+    unsubscribers.push(unsubState);
+
+    const unsubLog = window.electronAPI.game.onLog((message: string) => {
+      addLog(message);
+    });
+    unsubscribers.push(unsubLog);
+
+    const unsubError = window.electronAPI.game.onError((errorMsg: string) => {
+      error.value = errorMsg;
+      addLog(`Error: ${errorMsg}`);
+    });
+    unsubscribers.push(unsubError);
+
+    const unsubAIThinking = window.electronAPI.game.onAIThinking((playerId: string) => {
+      aiThinkingPlayerId.value = playerId;
+      const player = players.value.find(p => p.id === playerId);
+      if (player) {
+        addLog(`${player.name} is thinking...`);
+      }
+    });
+    unsubscribers.push(unsubAIThinking);
+
+    const unsubHandComplete = window.electronAPI.game.onHandComplete((handWinners: GameState['winners']) => {
+      if (handWinners.length > 0) {
+        handWinners.forEach(winner => {
+          const player = players.value.find(p => p.id === winner.playerId);
+          if (player) {
+            addLog(`${player.name} wins ${winner.amount} with ${winner.handRank}`);
+          }
+        });
+      }
+      addLog('Hand complete');
+    });
+    unsubscribers.push(unsubHandComplete);
+
+    const unsubGameComplete = window.electronAPI.game.onGameComplete(() => {
+      isGameComplete.value = true;
+      addLog('Game Over!');
+    });
+    unsubscribers.push(unsubGameComplete);
+  }
+
+  async function startGame(config: MatchConfig) {
     try {
       isLoading.value = true;
       error.value = null;
+      isGameComplete.value = false;
       currentMatchConfig.value = config;
 
-      const gameConfig: GameConfig = {
-        startingChips: config.startingChips,
-        smallBlind: config.smallBlind,
-        bigBlind: config.bigBlind,
-        players: config.players.map(p => ({
-          id: p.id,
-          name: p.name,
-          type: p.type,
-          seatIndex: p.seatIndex,
-          aiModel: p.aiConfig?.model
-        }))
-      };
+      setupEventListeners();
 
-      engine.value = new GameEngine(gameConfig);
-      gameState.value = engine.value.getState();
-      
-      addLog(`Game started with ${config.players.length} players`);
-      addLog(`Blinds: ${config.smallBlind}/${config.bigBlind}, Starting chips: ${config.startingChips}`);
+      if (window.electronAPI) {
+        const state = await window.electronAPI.game.start(config);
+        if (state) {
+          gameState.value = state;
+          addLog(`Game started with ${config.players.length} players`);
+          addLog(`Blinds: ${config.smallBlind}/${config.bigBlind}`);
+        }
+      } else {
+        throw new Error('Electron API not available');
+      }
       
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to start game';
@@ -91,38 +143,35 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function startNewHand() {
-    if (!engine.value) return;
+  async function startNewHand() {
+    if (!window.electronAPI) return;
     
     try {
-      gameState.value = engine.value.startNewHand();
-      addLog(`--- Hand #${gameState.value.handNumber} ---`);
-      
-      const sbPlayer = gameState.value.players[gameState.value.smallBlindIndex];
-      const bbPlayer = gameState.value.players[gameState.value.bigBlindIndex];
-      addLog(`${sbPlayer.name} posts small blind: ${gameState.value.smallBlind}`);
-      addLog(`${bbPlayer.name} posts big blind: ${gameState.value.bigBlind}`);
-      
+      isLoading.value = true;
+      const state = await window.electronAPI.game.newHand();
+      if (state) {
+        gameState.value = state;
+      }
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to start new hand';
       addLog(`Error: ${error.value}`);
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  function playerAction(action: PlayerAction, amount?: number) {
-    if (!engine.value || !gameState.value) return;
+  async function playerAction(action: PlayerAction, amount?: number) {
+    if (!window.electronAPI || !gameState.value) return;
     
     try {
       const player = currentPlayer.value;
       if (!player) return;
 
-      gameState.value = engine.value.executeAction(player.id, action, amount);
+      aiThinkingPlayerId.value = null;
       
-      const actionText = formatAction(action, amount);
-      addLog(`${player.name}: ${actionText}`);
-      
-      if (gameState.value.phase === 'showdown' || gameState.value.phase === 'ended') {
-        handleHandComplete();
+      const state = await window.electronAPI.game.action(action, amount);
+      if (state) {
+        gameState.value = state;
       }
       
     } catch (e) {
@@ -131,73 +180,80 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function handleHandComplete() {
-    if (!gameState.value) return;
-    
-    if (gameState.value.winners.length > 0) {
-      gameState.value.winners.forEach(winner => {
-        const player = players.value.find(p => p.id === winner.playerId);
-        if (player) {
-          addLog(`${player.name} wins ${winner.amount} with ${winner.handRank}`);
-        }
-      });
-    }
-    
-    addLog('Hand complete');
-  }
-
-  function formatAction(action: PlayerAction, amount?: number): string {
-    switch (action) {
-      case 'fold':
-        return 'Folds';
-      case 'check':
-        return 'Checks';
-      case 'call':
-        return `Calls ${amount}`;
-      case 'raise':
-        return `Raises to ${amount}`;
-      case 'all-in':
-        return `All-in for ${amount}`;
-      default:
-        return action;
-    }
-  }
-
   function getAvailableActions(playerId: string): PlayerAction[] {
-    if (!engine.value) return [];
-    const actionRequest = engine.value.getAvailableActions(playerId);
-    return actionRequest?.availableActions ?? [];
+    if (!gameState.value) return [];
+    
+    const player = gameState.value.players.find(p => p.id === playerId);
+    if (!player || player.isFolded || player.isAllIn) return [];
+
+    const actions: PlayerAction[] = [];
+    const callAmount = gameState.value.currentBet - player.currentBet;
+
+    if (callAmount === 0) {
+      actions.push('check');
+    } else if (player.chips >= callAmount) {
+      actions.push('call');
+    } else {
+      actions.push('all-in');
+    }
+
+    actions.push('fold');
+
+    if (player.chips > callAmount) {
+      actions.push('raise');
+    }
+
+    if (player.chips > 0 && callAmount === 0) {
+      actions.push('all-in');
+    }
+
+    return actions;
   }
 
   function getCallAmount(playerId: string): number {
-    if (!engine.value || !gameState.value) return 0;
+    if (!gameState.value) return 0;
     const player = gameState.value.players.find(p => p.id === playerId);
     if (!player) return 0;
     return Math.max(0, gameState.value.currentBet - player.currentBet);
   }
 
   function getMinRaiseAmount(playerId: string): number {
-    if (!engine.value) return 0;
-    const actionRequest = engine.value.getAvailableActions(playerId);
-    return actionRequest?.minRaiseAmount ?? 0;
+    if (!gameState.value) return 0;
+    const player = gameState.value.players.find(p => p.id === playerId);
+    if (!player) return 0;
+    return gameState.value.currentBet + gameState.value.minRaise;
   }
 
-  function resetGame() {
-    engine.value = null;
+  async function resetGame() {
+    if (window.electronAPI) {
+      await window.electronAPI.game.stop();
+    }
+    
+    unsubscribers.forEach(unsub => unsub());
+    unsubscribers.length = 0;
+    
     gameState.value = null;
     gameLog.value = [];
     currentMatchConfig.value = null;
     error.value = null;
+    aiThinkingPlayerId.value = null;
+    isGameComplete.value = false;
     addLog('Game reset');
   }
 
+  function cleanup() {
+    unsubscribers.forEach(unsub => unsub());
+    unsubscribers.length = 0;
+  }
+
   return {
-    engine,
     gameState,
     isLoading,
     error,
     gameLog,
     currentMatchConfig,
+    aiThinkingPlayerId,
+    isGameComplete,
     phase,
     players,
     communityCards,
@@ -214,6 +270,7 @@ export const useGameStore = defineStore('game', () => {
     humanPlayers,
     aiPlayers,
     activePlayers,
+    isHumanTurn,
     addLog,
     startGame,
     startNewHand,
@@ -222,5 +279,6 @@ export const useGameStore = defineStore('game', () => {
     getCallAmount,
     getMinRaiseAmount,
     resetGame,
+    cleanup,
   };
 });

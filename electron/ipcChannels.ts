@@ -9,6 +9,12 @@ export const IPC_CHANNELS = {
   GAME_LIST: 'game:list',
   GAME_DELETE: 'game:delete',
   
+  GAME_START: 'game:start',
+  GAME_ACTION: 'game:action',
+  GAME_NEW_HAND: 'game:newHand',
+  GAME_STATE: 'game:state',
+  GAME_STOP: 'game:stop',
+  
   AI_REQUEST: 'ai:request',
   AI_CANCEL: 'ai:cancel',
   

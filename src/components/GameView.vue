@@ -47,15 +47,43 @@
         </aside>
       </div>
 
+      <div v-if="isGameComplete" class="game-complete-overlay">
+        <div class="game-complete-modal">
+          <h2>🎉 Game Over!</h2>
+          <p v-if="finalWinner" class="winner-text">
+            {{ finalWinner.name }} wins the tournament with {{ finalWinner.chips }} chips!
+          </p>
+          <div class="modal-buttons">
+            <button @click="goBack" class="btn-primary">
+              Back to Menu
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="showHandComplete" class="hand-complete-bar">
+        <div class="hand-result">
+          <span v-if="winners.length > 0">
+            {{ winners.map(w => {
+              const p = players.find(pl => pl.id === w.playerId);
+              return p ? `${p.name} wins ${w.amount} with ${w.handRank}` : '';
+            }).join(' | ') }}
+          </span>
+        </div>
+        <button @click="startNewHand" class="btn-new-hand">
+          Deal Next Hand
+        </button>
+      </div>
+
       <ActionPanel
-        v-if="gameState"
+        v-else-if="gameState && !isGameComplete"
         :playerName="currentPlayer?.name ?? ''"
         :playerChips="currentPlayer?.chips ?? 0"
         :potSize="totalPot"
         :callAmount="callAmount"
         :minRaise="minRaise"
         :availableActions="availableActions"
-        :isHumanTurn="showActions"
+        :isHumanTurn="isHumanTurn"
         :currentPlayerName="currentPlayer?.name"
         @action="doAction"
       />
@@ -64,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useGameStore } from '../store/gameStore';
@@ -92,8 +120,12 @@ const {
   handNumber,
   winners,
   totalPot,
-  currentPlayer
+  currentPlayer,
+  isHumanTurn,
+  isGameComplete
 } = storeToRefs(gameStore);
+
+const showHandComplete = ref(false);
 
 const phaseLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -106,14 +138,6 @@ const phaseLabel = computed(() => {
     ended: 'GAME OVER'
   };
   return labels[phase.value] || phase.value.toUpperCase();
-});
-
-const showActions = computed(() => {
-  if (!gameState.value || !currentPlayer.value) return false;
-  return currentPlayer.value.type === 'human' && 
-         !currentPlayer.value.isFolded && 
-         phase.value !== 'showdown' && 
-         phase.value !== 'ended';
 });
 
 const availableActions = computed(() => {
@@ -131,19 +155,33 @@ const minRaise = computed(() => {
   return gameStore.getMinRaiseAmount(currentPlayer.value.id);
 });
 
+const finalWinner = computed(() => {
+  if (!isGameComplete.value || !players.value) return null;
+  return players.value.find(p => p.chips > 0) || null;
+});
+
 function goBack() {
   gameStore.resetGame();
   router.push('/');
 }
 
-function doAction(action: PlayerAction, amount?: number) {
-  gameStore.playerAction(action, amount);
+async function doAction(action: PlayerAction, amount?: number) {
+  await gameStore.playerAction(action, amount);
+  
+  if (phase.value === 'showdown' || phase.value === 'ended') {
+    showHandComplete.value = true;
+  }
 }
 
-onMounted(() => {
+async function startNewHand() {
+  showHandComplete.value = false;
+  await gameStore.startNewHand();
+}
+
+onMounted(async () => {
   if (!gameState.value && configStore.currentConfig) {
-    gameStore.startGame(configStore.currentConfig);
-    gameStore.startNewHand();
+    await gameStore.startGame(configStore.currentConfig);
+    await gameStore.startNewHand();
   }
 });
 </script>
@@ -211,6 +249,7 @@ onMounted(() => {
   flex-direction: column;
   padding: 24px;
   gap: 24px;
+  position: relative;
 }
 
 .game-content {
@@ -239,6 +278,78 @@ onMounted(() => {
 .game-sidebar {
   display: flex;
   flex-direction: column;
+}
+
+.game-complete-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.game-complete-modal {
+  background: #1e293b;
+  border-radius: 16px;
+  padding: 32px;
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.game-complete-modal h2 {
+  color: #fbbf24;
+  font-size: 28px;
+  margin-bottom: 16px;
+}
+
+.winner-text {
+  color: #e2e8f0;
+  font-size: 18px;
+  margin-bottom: 24px;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.hand-complete-bar {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.hand-result {
+  color: #34d399;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.btn-new-hand {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #059669, #047857);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-new-hand:hover {
+  background: linear-gradient(135deg, #10b981, #059669);
+  transform: translateY(-2px);
 }
 
 .btn-primary {

@@ -7,6 +7,7 @@ import {
   AIResponse,
   AppInfo 
 } from './ipcChannels';
+import type { GameState, PlayerAction } from '../src/game/types';
 
 export interface AIActionRequest {
   provider: string;
@@ -63,6 +64,57 @@ const electronAPI = {
     
     list: (): Promise<SavedGame[]> => 
       ipcRenderer.invoke(IPC_CHANNELS.GAME_LIST),
+    
+    start: (config: MatchConfig): Promise<GameState | null> => 
+      ipcRenderer.invoke(IPC_CHANNELS.GAME_START, config),
+    
+    newHand: (): Promise<GameState | null> => 
+      ipcRenderer.invoke(IPC_CHANNELS.GAME_NEW_HAND),
+    
+    action: (action: PlayerAction, amount?: number): Promise<GameState | null> => 
+      ipcRenderer.invoke(IPC_CHANNELS.GAME_ACTION, action, amount),
+    
+    getState: (): Promise<GameState | null> => 
+      ipcRenderer.invoke(IPC_CHANNELS.GAME_STATE),
+    
+    stop: (): Promise<boolean> => 
+      ipcRenderer.invoke(IPC_CHANNELS.GAME_STOP),
+    
+    onStateChange: (callback: (state: GameState) => void) => {
+      const handler = (_event: unknown, state: GameState) => callback(state);
+      ipcRenderer.on(IPC_CHANNELS.GAME_STATE, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.GAME_STATE, handler);
+    },
+    
+    onLog: (callback: (message: string) => void) => {
+      const handler = (_event: unknown, message: string) => callback(message);
+      ipcRenderer.on('game:log', handler);
+      return () => ipcRenderer.removeListener('game:log', handler);
+    },
+    
+    onError: (callback: (error: string) => void) => {
+      const handler = (_event: unknown, error: string) => callback(error);
+      ipcRenderer.on('game:error', handler);
+      return () => ipcRenderer.removeListener('game:error', handler);
+    },
+    
+    onAIThinking: (callback: (playerId: string) => void) => {
+      const handler = (_event: unknown, playerId: string) => callback(playerId);
+      ipcRenderer.on('game:ai-thinking', handler);
+      return () => ipcRenderer.removeListener('game:ai-thinking', handler);
+    },
+    
+    onHandComplete: (callback: (winners: GameState['winners']) => void) => {
+      const handler = (_event: unknown, winners: GameState['winners']) => callback(winners);
+      ipcRenderer.on('game:hand-complete', handler);
+      return () => ipcRenderer.removeListener('game:hand-complete', handler);
+    },
+    
+    onGameComplete: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on('game:complete', handler);
+      return () => ipcRenderer.removeListener('game:complete', handler);
+    },
   },
 
   ai: {

@@ -59,7 +59,7 @@
     "id": "9",
     "title": "Integrate Game Loop",
     "description": "Connect the UI, Game Engine, and LLM services to run a complete hand, manage turns, and handle side pots.",
-    "passes": false,
+    "passes": true,
     "priority": 9
   },
   {

@@ -23,6 +23,9 @@ export const useMatchConfigStore = defineStore('matchConfig', () => {
     isLoading.value = true;
     error.value = null;
     try {
+      if (!window.electronAPI) {
+        throw new Error('Electron API not available');
+      }
       const result = await window.electronAPI.config.list();
       configs.value = result;
     } catch (e) {
@@ -36,6 +39,9 @@ export const useMatchConfigStore = defineStore('matchConfig', () => {
     isLoading.value = true;
     error.value = null;
     try {
+      if (!window.electronAPI) {
+        throw new Error('Electron API not available');
+      }
       await window.electronAPI.config.save(config);
       await loadConfigs();
     } catch (e) {
@@ -49,6 +55,9 @@ export const useMatchConfigStore = defineStore('matchConfig', () => {
     isLoading.value = true;
     error.value = null;
     try {
+      if (!window.electronAPI) {
+        throw new Error('Electron API not available');
+      }
       await window.electronAPI.config.delete(id);
       await loadConfigs();
     } catch (e) {
