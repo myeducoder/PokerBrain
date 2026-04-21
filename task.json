@@ -52,7 +52,7 @@
     "id": "8",
     "title": "Create Human Action Panel UI",
     "description": "Build Vue components for human players to input actions (Fold, Check, Call, Raise).",
-    "passes": false,
+    "passes": true,
     "priority": 8
   },
   {
